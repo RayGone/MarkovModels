@@ -2,7 +2,7 @@ from logging import raiseExceptions
 from scipy import stats as st
 import numpy as np
 
-class GHMM:
+class GMMHMM:
     def __init__(self,n_states) -> None:
         self.ns = n_states # number of hidden states
 

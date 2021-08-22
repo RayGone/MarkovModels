@@ -8,7 +8,7 @@ from python_speech_features import mfcc
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.cbook import flatten
-from GaussianHMM import GHMM
+from GMMHMM import GHMM
 
 def plot_mfcc(feat):
     fig, ax = plt.subplots()
@@ -51,10 +51,8 @@ for i in mfeatures:
 mfcc_feat = np.array(mfcc_feat)
 
 model = GHMM(6)
-model.train(mfcc_feat[0])
-# print(np.eye(5))
-# print(0.1*np.eye(5)[:, :, None])
-# print("Emission Probability:",st.multivariate_normal.pdf(mfcc_feat[0].T,mu[:,1].T,covs[1].T))
+model.train(mfcc_feat[0],10)
+print(model.score(mfcc_feat[2]))
 
 # plot_mfcc(mfeatures[1][0])
 # flat0 = list(flatten(mfeatures[0]))
