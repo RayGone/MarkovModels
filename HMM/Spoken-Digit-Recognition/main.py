@@ -8,6 +8,7 @@ from python_speech_features import mfcc
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.cbook import flatten
+from GaussianHMM import GHMM
 
 def plot_mfcc(feat):
     fig, ax = plt.subplots()
@@ -20,34 +21,42 @@ def plot_histogram(feat):
     plt.hist(feat)    
     plt.show()
 
-
-pi = np.random.RandomState(0).rand(6, 1)
-A = np.random.RandomState(0).rand(6, 6)
-pi = (pi + (pi==0))/np.sum(pi)
-print(pi)
-A = (A+(A==0))/np.sum(A,axis=1)
-print(A)
-
-exit()
-
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
+data_path = '../../../recordings'
 
 file_list = []
 for i in range(10):
-    file_list.append([ f for f in os.listdir('../recordings') if f.split('_')[0] == str(i)])
+    file_list.append([ f for f in os.listdir(data_path) if f.split('_')[0] == str(i)])
 
-mfeatures = []
+mfeatures = np.zeros((len(file_list[0]),16000))
+i=0
+max_size = 0
+sr = 0
 for fi in file_list:
-    temp = []
     for f in fi:
-        _, d = wavfile.read('../recordings/'+f)
-        temp.append(mfcc(d,_))
-    mfeatures.append(temp)
+        _, d = wavfile.read(data_path+"/"+f)
+        sr = _
+        mfeatures[i,:d.shape[0]] = d
+        i+=1
+        if(max_size < d.shape[0]):
+            max_size = d.shape[0]        
     break
 
-plot_mfcc(mfeatures[0][0])
-# plot_mfcc(mfeatures[1][0])
+mfeatures = mfeatures[:,:max_size]
 
+mfcc_feat = []
+for i in mfeatures:
+    mfcc_feat.append(np.array(mfcc(i,sr,numcep=6)).T)
+    
+mfcc_feat = np.array(mfcc_feat)
+
+model = GHMM(6)
+model.train(mfcc_feat[0])
+# print(np.eye(5))
+# print(0.1*np.eye(5)[:, :, None])
+# print("Emission Probability:",st.multivariate_normal.pdf(mfcc_feat[0].T,mu[:,1].T,covs[1].T))
+
+# plot_mfcc(mfeatures[1][0])
 # flat0 = list(flatten(mfeatures[0]))
 # flat1 = list(flatten(mfeatures[1]))
 
