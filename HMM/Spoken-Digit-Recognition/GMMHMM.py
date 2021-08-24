@@ -1,6 +1,60 @@
-from logging import raiseExceptions
 from scipy import stats as st
 import numpy as np
+from numpy import linalg as la
+
+
+##copied from stackoverflow: https://stackoverflow.com/questions/43238173/python-convert-matrix-to-positive-semi-definite/43244194?fbclid=IwAR16qFZel8kjzgkJHAckWLIgrAgyc7MJz3GgcdnXbCF08RE9TR70Y_lQ1xk
+def nearestPD(A):
+    """Find the nearest positive-definite matrix to input
+
+    A Python/Numpy port of John D'Errico's `nearestSPD` MATLAB code [1], which
+    credits [2].
+
+    [1] https://www.mathworks.com/matlabcentral/fileexchange/42885-nearestspd
+
+    [2] N.J. Higham, "Computing a nearest symmetric positive semidefinite
+    matrix" (1988): https://doi.org/10.1016/0024-3795(88)90223-6
+    """
+    B = (A + A.T) / 2
+    _, s, V = la.svd(B)
+
+    H = np.dot(V.T, np.dot(np.diag(s), V))
+
+    A2 = (B + H) / 2
+
+    A3 = (A2 + A2.T) / 2
+
+    if isPD(A3):
+        return A3
+
+    spacing = np.spacing(la.norm(A))
+    # The above is different from [1]. It appears that MATLAB's `chol` Cholesky
+    # decomposition will accept matrixes with exactly 0-eigenvalue, whereas
+    # Numpy's will not. So where [1] uses `eps(mineig)` (where `eps` is Matlab
+    # for `np.spacing`), we use the above definition. CAVEAT: our `spacing`
+    # will be much larger than [1]'s `eps(mineig)`, since `mineig` is usually on
+    # the order of 1e-16, and `eps(1e-16)` is on the order of 1e-34, whereas
+    # `spacing` will, for Gaussian random matrixes of small dimension, be on
+    # othe order of 1e-16. In practice, both ways converge, as the unit test
+    # below suggests.
+    I = np.eye(A.shape[0])
+    k = 1
+    while not isPD(A3):
+        mineig = np.min(np.real(la.eigvals(A3)))
+        A3 += I * (-mineig * k**2 + spacing)
+        k += 1
+
+    return A3
+
+
+def isPD(B):
+    """Returns true when input is positive-definite, via Cholesky"""
+    try:
+        _ = la.cholesky(B)
+        return True
+    except la.LinAlgError:
+        return False
+
 
 class GMMHMM:
     def __init__(self,n_states) -> None:
@@ -45,7 +99,8 @@ class GMMHMM:
         obs = np.atleast_2d(obs)
         self.B = np.zeros((self.ns,obs.shape[1]))
         for s in range(self.ns):
-            self.B[s,:] = st.multivariate_normal.pdf(obs.T,mean=self.mu[s],cov=self.cov[s])
+            # print(self.cov[s],self.mu[s])
+            self.B[s,:] = st.multivariate_normal.pdf(obs.T,mean=self.mu[s],cov=self.cov[s],allow_singular=True)
 
     def _forward(self):
         '''
@@ -100,6 +155,9 @@ class GMMHMM:
 
         ksi = self._stochastize(ksi) 
         self.A = ksi # -ksi- is the expected state transition matrix
+        for i in range(gamma.shape[0]):
+            gamma[i] = self._normalize(gamma[i])
+            gamma[i] /= np.min(gamma[i])
 
         #maximizing the states. i.e. mean vector and covariance
         expected_mu = np.zeros((self.nd,self.ns))
@@ -114,15 +172,14 @@ class GMMHMM:
             gamma_obs = obs * gamma[s]
             expected_mu[s] = np.sum(gamma_obs, axis=1) / gamma_state_sum[s]
 
-            partial_covs = obs.T - expected_mu[s]
-            partial_covs = np.dot(gamma,partial_covs*partial_covs) / gamma_state_sum
-            expected_cov[s] = np.triu(partial_covs) + np.triu(partial_covs).T - np.diag(np.diag(partial_covs))
-        
-            
-            
+            partial_covs = gamma_obs.T - expected_mu[s]
+            partial_covs = np.dot(partial_covs.T,partial_covs) / gamma_state_sum
+            partial_covs = np.triu(partial_covs) + np.triu(partial_covs).T - np.diag(np.diag(partial_covs))
+            expected_cov[s] = nearestPD(partial_covs)            
+
         #Ensure positive semidefinite by adding diagonal loading
-        expected_cov += .01 * np.eye(self.nd)[:,:,None]
-        print(np.linalg.det(expected_cov[0]),np.linalg.eig(expected_cov[0]))
+        expected_cov += .01 * np.eye(self.nd)[:, :, None]
+
         self.mu = expected_mu
         self.cov = expected_cov
 
