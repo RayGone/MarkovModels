@@ -7,6 +7,7 @@
 This implementation is general and can be used to recognize any isolated speech. Thus it is a Isolated Speech Recogntion module.
 ## SR-hmmlearn
 ### Speech Recognition using hmmlearn package
+- hmmlearn is a HMM package which was formerly a part of scikit-learn; which is now removed from scikit-learn
 # Language Model 
 ### Text Generation using Markov Model
 - This implementation uses a 2nd order Markov model to train using two files (a set of poems) and produces poems. No.of verses (lines) can be set as a parameter.
